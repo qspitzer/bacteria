@@ -1,0 +1,118 @@
+import time
+import random
+import os
+import sys
+from threading import Thread
+import socket
+import pickle
+import json
+
+#s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+config = json.load(open("config.json"))
+
+species = "bacteria"
+mutationChance = 5
+lifespan = 2
+restingTime = 10
+deviationValue = 2
+diseaseResistance = 10
+idealTemp = 75
+tempVar = 10
+resourceUseTime = 2
+requiredResources = [["oxygen", 1]]
+producedResources = [["carbonDioxide", 1]]
+
+def mutation(allVariables, mutationChance):
+	intVariables = []
+	for x in allVariables:
+		if type(eval(x)) == int:
+			intVariables.append(x)
+			
+	if mutationChance >= 1:
+		mutate = random.randint(1, mutationChance)
+	else:
+		mutate = random.randint(mutationChance, 1)
+
+	if mutate == 1:
+		mutate = True
+		changeID = random.randint(0, (len(intVariables)-1))
+		changeVar = intVariables[changeID]
+	else:
+		mutate = False
+		changeVar = None
+
+	return mutate, changeVar
+	
+	
+def replicate(mutate, changeVar, deviationValue):
+	#creates new file
+	fileName = os.path.basename(__file__)
+	newFileName = species + str(random.randint(1, 99999999)) + ".py"
+	newFile = open(newFileName, 'w+') 
+	
+	#opens file + writes to file
+	with open(fileName, 'r') as file:
+		for x in file:
+			#checks if mutating
+			if mutate:
+				if ("{0} = ".format(changeVar)) in x:
+					currentValue = eval(changeVar)
+					deviation = currentValue / deviationValue
+					newValue = round(random.gauss(currentValue, deviation))
+					newLine = "{0} = {1}\n".format(changeVar, newValue)
+					newFile.write(newLine)
+				else:
+					newFile.write(x)
+			else:
+				newFile.write(x)
+	newFile.close()
+
+	if sys.platform == 'win32':
+		os.popen("python {0}".format(newFileName))
+	else:
+		os.popen("python3 {0}".format(newFileName))
+
+	
+
+allVariables = set(dir()) - set(dir(__builtins__))
+
+#uses resources
+def useResource(useTime, required, produced):
+	message = [required, produced]
+	HOST = config["HOST"]
+	PORT = config["PORT"]
+	remote_ip = socket.gethostbyname(HOST)
+	while True:
+		time.sleep(useTime)
+		s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		s.connect((remote_ip, PORT))
+		s.send(pickle.dumps(message))
+		response = s.recv(1024).decode("utf-8").rstrip()
+		if response == "dead":
+			s.shutdown(socket.SHUT_WR)
+			s.close()
+			os.remove(__file__)
+			os._exit(1)
+		temp = int(response)
+		#print(temp)
+		if (idealTemp + tempVar) < temp or (idealTemp - tempVar) > temp:
+			s.shutdown(socket.SHUT_WR)
+			s.close()
+			os.remove(__file__)
+			os._exit(1)
+			
+		s.shutdown(socket.SHUT_WR)
+		s.close()
+		
+Thread(target=useResource, args=(resourceUseTime, requiredResources, producedResources)).start()
+#useResource(resourceUseTime, requiredResources, producedResources)
+	
+#replicates while alive
+while lifespan > 0:
+	time.sleep(restingTime)
+	mutate, changeVar = mutation(allVariables, mutationChance)
+	replicate(mutate, changeVar, deviationValue)
+	lifespan-=1
+os.remove(__file__)
+os._exit(1)
