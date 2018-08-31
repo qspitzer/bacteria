@@ -5,8 +5,11 @@ import sys
 from threading import Thread
 import socket
 import pickle
+import json
 
 #s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+config = json.load(open("config.json"))
 
 species = "tree"
 mutationChance = 5
@@ -69,15 +72,16 @@ def replicate(mutate, changeVar, deviationValue):
 		os.popen("python {0}".format(newFileName))
 	else:
 		os.popen("python3 {0}".format(newFileName))
-	#print("other file started")
+
 	
 
 allVariables = set(dir()) - set(dir(__builtins__))
 
+#uses resources
 def useResource(useTime, required, produced):
 	message = [required, produced]
-	HOST = 'localhost'
-	PORT = 8888
+	HOST = config["HOST"]
+	PORT = config["PORT"]
 	remote_ip = socket.gethostbyname(HOST)
 	while True:
 		time.sleep(useTime)
@@ -99,6 +103,10 @@ def useResource(useTime, required, produced):
 			
 		s.shutdown(socket.SHUT_WR)
 		s.close()
+
+HOST = config["HOST"]
+PORT = config["PORT"]
+#dataStart =
 
 Thread(target=useResource, args=(resourceUseTime, requiredResources, producedResources)).start()
 #useResource(resourceUseTime, requiredResources, producedResources)
